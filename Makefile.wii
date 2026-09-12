@@ -1,0 +1,74 @@
+PROJECT_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+ifeq ($(strip $(DEVKITPRO)),)
+$(error "Set DEVKITPRO in your environment, e.g. export DEVKITPRO=/opt/devkitpro")
+endif
+
+export CC  := $(DEVKITPPC)/bin/powerpc-eabi-gcc
+export CXX := $(DEVKITPPC)/bin/powerpc-eabi-g++
+
+export LD  := $(DEVKITPPC)/bin/powerpc-eabi-g++
+
+ifeq ($(strip $(DEVKITPPC)),)
+export DEVKITPPC := $(DEVKITPRO)/devkitPPC
+endif
+
+include $(DEVKITPPC)/wii_rules
+
+TARGET      := th06
+BUILD       := build-wii
+SOURCES     := src src/graphics src/pbg3 src/midi src/thirdparty
+DATA        := data
+INCLUDES := src
+
+export INCLUDES := -I$(PROJECT_ROOT)/src \
+                   -I$(BUILD) \
+                   -I$(LIBOGC_INC) \
+                   -I$(DEVKITPRO)/portlibs/wii/include \
+                   -I$(DEVKITPRO)/portlibs/ppc/include
+
+export LIBPATHS := -L$(LIBOGC_LIB) \
+                   -L$(DEVKITPRO)/portlibs/wii/lib \
+                   -L$(DEVKITPRO)/portlibs/ppc/lib
+
+CFLAGS := -g -O2 -Wall $(MACHDEP) $(INCLUDES) -DGEKKO -DSDL_MAIN_HANDLED
+CXXFLAGS := $(CFLAGS) -std=c++20 -fno-exceptions
+LDFLAGS     := -g $(MACHDEP) -Wl,-Map,$(notdir $@).map
+
+LIBS := -lwiiuse -lbte -lSDL2_ttf -lSDL2_image -lSDL2 -laesnd -lwiikeyboard -lfreetype -lharfbuzz -lpng16 -lz -lbz2 -lbrotlidec -lbrotlicommon -lfat -logc -lm
+
+ifneq ($(BUILD),$(notdir $(CURDIR)))
+
+export OUTPUT := $(CURDIR)/$(BUILD)/$(TARGET)
+export TOPDIR := $(CURDIR)
+
+export VPATH := $(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
+                $(foreach dir,$(DATA),$(CURDIR)/$(dir))
+
+export DEPSDIR := $(CURDIR)/$(BUILD)
+
+CFILES      := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
+CPPFILES    := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
+CPPFILES := $(filter-out WebGL.cpp FixedFunctionGL.cpp MidiAlsa.cpp MidiCoreAudio.cpp MidiWin32.cpp,$(CPPFILES))
+
+export OFILES := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o)
+
+.PHONY: $(BUILD) clean
+
+$(BUILD):
+	@[ -d $@ ] || mkdir -p $@
+	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile.wii
+
+clean:
+	@echo clean ...
+	@rm -fr $(BUILD)
+
+else
+
+DEPENDS := $(OFILES:.o=.d)
+
+$(OUTPUT).dol: $(OUTPUT).elf
+$(OUTPUT).elf: $(OFILES)
+
+-include $(DEPENDS)
+
+endif

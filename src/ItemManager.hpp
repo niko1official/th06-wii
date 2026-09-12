@@ -1,0 +1,45 @@
+#pragma once
+
+#include "AnmVm.hpp"
+#include "ZunTimer.hpp"
+#include "inttypes.hpp"
+
+enum ItemType
+{
+    ITEM_POWER_SMALL,
+    ITEM_POINT,
+    ITEM_POWER_BIG,
+    ITEM_BOMB,
+    ITEM_FULL_POWER,
+    ITEM_LIFE,
+    ITEM_POINT_BULLET,
+    ITEM_NO_ITEM = 0xffffffff,
+};
+
+struct Item
+{
+    AnmVm sprite;
+    ZunVec3 currentPosition;
+    ZunVec3 startPosition;
+    ZunVec3 targetPosition;
+    ZunTimer timer;
+    i8 itemType;
+    i8 isInUse;
+    i8 unk_142;
+    i8 state;
+};
+
+struct ItemManager
+{
+    ItemManager();
+    void SpawnItem(const ZunVec3 *position, ItemType type, i32 state);
+    void OnUpdate();
+    void OnDraw();
+    void RemoveAllItems();
+
+    Item items[513];
+    i32 nextIndex;
+    u32 itemCount;
+};
+
+extern ItemManager g_ItemManager;
