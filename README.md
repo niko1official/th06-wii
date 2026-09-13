@@ -48,3 +48,7 @@ Compile:
 
 `make -f Makefile.wii V=1`
 
+
+Once again, compiling has only been tested on a Windows environment. If possible, you may make a fork or pull request with a README containing your own experience and/or instructions, as this is my first actual public Github release.
+
+###### Please, enjoy!
