@@ -9,10 +9,8 @@ Please make sure to give them support in their project.
 
 # Installation
 
-If you have installed the main files from the Release, you will need a few things before moving on. 
-First of all, you will need to add a font to your app directory with the file name `msgothic.ttc`.
-This may be the actual MS Gothic, taken from a Windows machine, or a compatible font such as Kochi Gothic.
-This also uses the Japanese EoSD filenames (e.g. 紅魔郷CM.DAT, 東方紅魔郷.cfg), you will need to provide your own files from your own EoSD copy.
+If you have installed the main files from the [Release](https://github.com/niko1official/th06-wii/releases/tag/th06), you will need a few things before moving on. 
+This uses the Japanese EoSD filenames (e.g. 紅魔郷CM.DAT, 東方紅魔郷.cfg), you will need to provide your own files from your own EoSD copy.
 English and other patches, do not work.
 Lastly, you will need to add the `bgm` folder from your EoSD copy too.
 
