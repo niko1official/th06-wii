@@ -9,6 +9,8 @@
 
 #ifdef GEKKO
 
+#include <SDL2/SDL_gamecontroller.h>
+#include <cstring>
 #include <ogc/pad.h>
 #include <wiiuse/wpad.h>
 
@@ -16,10 +18,8 @@ u16 Controller::GetJoystickCaps(void)
 {
 
     PAD_Init();
-    if (WPAD_Init() < 0)
-        return 1;
-
-    WPAD_SetDataFormat(WPAD_CHAN_ALL, WPAD_FMT_BTNS);
+    if (WPAD_Init() >= 0)
+        WPAD_SetDataFormat(WPAD_CHAN_ALL, WPAD_FMT_BTNS);
     return 0;
 }
 
@@ -76,9 +76,13 @@ u16 Controller::GetInput(void)
             buttons |= TH_BUTTON_SHOOT;
         if (gcHeld & PAD_BUTTON_B)
             buttons |= TH_BUTTON_BOMB;
+        if (gcHeld & PAD_BUTTON_X)
+            buttons |= TH_BUTTON_SKIP;
         if (gcHeld & PAD_TRIGGER_R)
             buttons |= TH_BUTTON_FOCUS;
         if (gcHeld & PAD_TRIGGER_L)
+            buttons |= TH_BUTTON_SHOOT;
+        if (gcHeld & PAD_TRIGGER_Z)
             buttons |= TH_BUTTON_SKIP;
         if (gcHeld & PAD_BUTTON_START)
             buttons |= TH_BUTTON_MENU;
@@ -103,20 +107,17 @@ u16 Controller::GetInput(void)
                 buttons |= TH_BUTTON_DOWN;
         }
     }
-    else
-    {
-        s8 gx = PAD_StickX(0);
-        s8 gy = PAD_StickY(0);
-        const s8 DEAD_ZONE = 20;
-        if (gx > DEAD_ZONE)
-            buttons |= TH_BUTTON_RIGHT;
-        if (gx < -DEAD_ZONE)
-            buttons |= TH_BUTTON_LEFT;
-        if (gy > DEAD_ZONE)
-            buttons |= TH_BUTTON_UP;
-        if (gy < -DEAD_ZONE)
-            buttons |= TH_BUTTON_DOWN;
-    }
+    s8 gx = PAD_StickX(0);
+    s8 gy = PAD_StickY(0);
+    const s8 DEAD_ZONE = 20;
+    if (gx > DEAD_ZONE)
+        buttons |= TH_BUTTON_RIGHT;
+    if (gx < -DEAD_ZONE)
+        buttons |= TH_BUTTON_LEFT;
+    if (gy > DEAD_ZONE)
+        buttons |= TH_BUTTON_UP;
+    if (gy < -DEAD_ZONE)
+        buttons |= TH_BUTTON_DOWN;
 
     return buttons;
 }
@@ -124,8 +125,36 @@ u16 Controller::GetInput(void)
 const u8 *Controller::GetControllerState()
 {
 
-    static u8 dummy[32] = {0};
-    return dummy;
+    static u8 controllerData[SDL_CONTROLLER_BUTTON_MAX];
+    std::memset(controllerData, 0, sizeof(controllerData));
+
+    u16 held = PAD_ButtonsHeld(0);
+    if (held & PAD_BUTTON_A)
+        controllerData[SDL_CONTROLLER_BUTTON_A] = 0x80;
+    if (held & PAD_BUTTON_B)
+        controllerData[SDL_CONTROLLER_BUTTON_B] = 0x80;
+    if (held & PAD_BUTTON_X)
+        controllerData[SDL_CONTROLLER_BUTTON_X] = 0x80;
+    if (held & PAD_BUTTON_Y)
+        controllerData[SDL_CONTROLLER_BUTTON_Y] = 0x80;
+    if (held & PAD_BUTTON_START)
+        controllerData[SDL_CONTROLLER_BUTTON_START] = 0x80;
+    if (held & PAD_BUTTON_UP)
+        controllerData[SDL_CONTROLLER_BUTTON_DPAD_UP] = 0x80;
+    if (held & PAD_BUTTON_DOWN)
+        controllerData[SDL_CONTROLLER_BUTTON_DPAD_DOWN] = 0x80;
+    if (held & PAD_BUTTON_LEFT)
+        controllerData[SDL_CONTROLLER_BUTTON_DPAD_LEFT] = 0x80;
+    if (held & PAD_BUTTON_RIGHT)
+        controllerData[SDL_CONTROLLER_BUTTON_DPAD_RIGHT] = 0x80;
+    if (held & PAD_TRIGGER_L)
+        controllerData[SDL_CONTROLLER_BUTTON_LEFTSHOULDER] = 0x80;
+    if (held & PAD_TRIGGER_R)
+        controllerData[SDL_CONTROLLER_BUTTON_RIGHTSHOULDER] = 0x80;
+    if (held & PAD_TRIGGER_Z)
+        controllerData[SDL_CONTROLLER_BUTTON_BACK] = 0x80;
+
+    return controllerData;
 }
 
 #else
