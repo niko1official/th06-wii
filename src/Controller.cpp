@@ -1,12 +1,5 @@
 #include "Controller.hpp"
 
-#ifndef GEKKO
-#include "GameErrorContext.hpp"
-#include "Supervisor.hpp"
-#include "i18n.hpp"
-#include "utils.hpp"
-#endif
-
 #ifdef GEKKO
 
 #include <SDL2/SDL_gamecontroller.h>
@@ -16,7 +9,6 @@
 
 u16 Controller::GetJoystickCaps(void)
 {
-
     PAD_Init();
     if (WPAD_Init() >= 0)
         WPAD_SetDataFormat(WPAD_CHAN_ALL, WPAD_FMT_BTNS);
@@ -25,7 +17,6 @@ u16 Controller::GetJoystickCaps(void)
 
 void Controller::ResetKeyboard(void)
 {
-
 }
 
 u16 Controller::GetInput(void)
@@ -38,11 +29,8 @@ u16 Controller::GetInput(void)
     u32 wiimoteHeld = WPAD_ButtonsHeld(0);
     u32 gcHeld = PAD_ButtonsHeld(0);
 
-    if (wiimoteHeld & (WPAD_BUTTON_UP | WPAD_BUTTON_DOWN | WPAD_BUTTON_LEFT | WPAD_BUTTON_RIGHT | WPAD_BUTTON_2 |
-                       WPAD_BUTTON_1 | WPAD_BUTTON_A | WPAD_BUTTON_B | WPAD_BUTTON_PLUS | WPAD_BUTTON_HOME) ||
-        gcHeld)
+    if (wiimoteHeld || gcHeld)
     {
-
         if (wiimoteHeld & WPAD_BUTTON_RIGHT)
             buttons |= TH_BUTTON_UP;
         if (wiimoteHeld & WPAD_BUTTON_LEFT)
@@ -62,6 +50,27 @@ u16 Controller::GetInput(void)
         if (wiimoteHeld & WPAD_BUTTON_PLUS)
             buttons |= TH_BUTTON_MENU;
         if (wiimoteHeld & WPAD_BUTTON_HOME)
+            buttons |= TH_BUTTON_HOME;
+
+        if (wiimoteHeld & WPAD_CLASSIC_BUTTON_UP)
+            buttons |= TH_BUTTON_UP;
+        if (wiimoteHeld & WPAD_CLASSIC_BUTTON_DOWN)
+            buttons |= TH_BUTTON_DOWN;
+        if (wiimoteHeld & WPAD_CLASSIC_BUTTON_LEFT)
+            buttons |= TH_BUTTON_LEFT;
+        if (wiimoteHeld & WPAD_CLASSIC_BUTTON_RIGHT)
+            buttons |= TH_BUTTON_RIGHT;
+        if (wiimoteHeld & WPAD_CLASSIC_BUTTON_A)
+            buttons |= TH_BUTTON_SHOOT;
+        if (wiimoteHeld & WPAD_CLASSIC_BUTTON_B)
+            buttons |= TH_BUTTON_BOMB;
+        if (wiimoteHeld & WPAD_CLASSIC_BUTTON_FULL_R)
+            buttons |= TH_BUTTON_FOCUS;
+        if (wiimoteHeld & (WPAD_CLASSIC_BUTTON_X | WPAD_CLASSIC_BUTTON_Y))
+            buttons |= TH_BUTTON_SKIP;
+        if (wiimoteHeld & WPAD_CLASSIC_BUTTON_PLUS)
+            buttons |= TH_BUTTON_MENU;
+        if (wiimoteHeld & WPAD_CLASSIC_BUTTON_HOME)
             buttons |= TH_BUTTON_HOME;
 
         if (gcHeld & PAD_BUTTON_UP)
@@ -106,7 +115,38 @@ u16 Controller::GetInput(void)
             if (ny < -DEAD_ZONE)
                 buttons |= TH_BUTTON_DOWN;
         }
+        else if (exp.type == WPAD_EXP_CLASSIC)
+        {
+            const joystick_t &stick = exp.classic.ljs;
+            float x = 0.0f;
+            float y = 0.0f;
+
+            if (stick.pos.x >= stick.center.x && stick.max.x != stick.center.x)
+                x = static_cast<float>(stick.pos.x - stick.center.x) /
+                    static_cast<float>(stick.max.x - stick.center.x);
+            else if (stick.min.x != stick.center.x)
+                x = -static_cast<float>(stick.center.x - stick.pos.x) /
+                    static_cast<float>(stick.center.x - stick.min.x);
+
+            if (stick.pos.y >= stick.center.y && stick.max.y != stick.center.y)
+                y = static_cast<float>(stick.pos.y - stick.center.y) /
+                    static_cast<float>(stick.max.y - stick.center.y);
+            else if (stick.min.y != stick.center.y)
+                y = -static_cast<float>(stick.center.y - stick.pos.y) /
+                    static_cast<float>(stick.center.y - stick.min.y);
+
+            const float DEAD_ZONE = 0.25f;
+            if (x > DEAD_ZONE)
+                buttons |= TH_BUTTON_RIGHT;
+            if (x < -DEAD_ZONE)
+                buttons |= TH_BUTTON_LEFT;
+            if (y > DEAD_ZONE)
+                buttons |= TH_BUTTON_UP;
+            if (y < -DEAD_ZONE)
+                buttons |= TH_BUTTON_DOWN;
+        }
     }
+
     s8 gx = PAD_StickX(0);
     s8 gy = PAD_StickY(0);
     const s8 DEAD_ZONE = 20;
@@ -124,11 +164,12 @@ u16 Controller::GetInput(void)
 
 const u8 *Controller::GetControllerState()
 {
-
     static u8 controllerData[SDL_CONTROLLER_BUTTON_MAX];
     std::memset(controllerData, 0, sizeof(controllerData));
 
     u16 held = PAD_ButtonsHeld(0);
+    u32 wpadHeld = WPAD_ButtonsHeld(0);
+
     if (held & PAD_BUTTON_A)
         controllerData[SDL_CONTROLLER_BUTTON_A] = 0x80;
     if (held & PAD_BUTTON_B)
@@ -154,14 +195,42 @@ const u8 *Controller::GetControllerState()
     if (held & PAD_TRIGGER_Z)
         controllerData[SDL_CONTROLLER_BUTTON_BACK] = 0x80;
 
+    if (wpadHeld & WPAD_CLASSIC_BUTTON_A)
+        controllerData[SDL_CONTROLLER_BUTTON_A] = 0x80;
+    if (wpadHeld & WPAD_CLASSIC_BUTTON_B)
+        controllerData[SDL_CONTROLLER_BUTTON_B] = 0x80;
+    if (wpadHeld & WPAD_CLASSIC_BUTTON_X)
+        controllerData[SDL_CONTROLLER_BUTTON_X] = 0x80;
+    if (wpadHeld & WPAD_CLASSIC_BUTTON_Y)
+        controllerData[SDL_CONTROLLER_BUTTON_Y] = 0x80;
+    if (wpadHeld & WPAD_CLASSIC_BUTTON_PLUS)
+        controllerData[SDL_CONTROLLER_BUTTON_START] = 0x80;
+    if (wpadHeld & WPAD_CLASSIC_BUTTON_MINUS)
+        controllerData[SDL_CONTROLLER_BUTTON_BACK] = 0x80;
+    if (wpadHeld & WPAD_CLASSIC_BUTTON_UP)
+        controllerData[SDL_CONTROLLER_BUTTON_DPAD_UP] = 0x80;
+    if (wpadHeld & WPAD_CLASSIC_BUTTON_DOWN)
+        controllerData[SDL_CONTROLLER_BUTTON_DPAD_DOWN] = 0x80;
+    if (wpadHeld & WPAD_CLASSIC_BUTTON_LEFT)
+        controllerData[SDL_CONTROLLER_BUTTON_DPAD_LEFT] = 0x80;
+    if (wpadHeld & WPAD_CLASSIC_BUTTON_RIGHT)
+        controllerData[SDL_CONTROLLER_BUTTON_DPAD_RIGHT] = 0x80;
+    if (wpadHeld & (WPAD_CLASSIC_BUTTON_FULL_L | WPAD_CLASSIC_BUTTON_ZL))
+        controllerData[SDL_CONTROLLER_BUTTON_LEFTSHOULDER] = 0x80;
+    if (wpadHeld & (WPAD_CLASSIC_BUTTON_FULL_R | WPAD_CLASSIC_BUTTON_ZR))
+        controllerData[SDL_CONTROLLER_BUTTON_RIGHTSHOULDER] = 0x80;
+
     return controllerData;
 }
 
 #else
 
+#include "Supervisor.hpp"
+
 #include <SDL2/SDL_events.h>
 #include <SDL2/SDL_keyboard.h>
 #include <SDL2/SDL_scancode.h>
+#include <cstring>
 
 static u16 g_FocusButtonConflictState;
 static u8 *keyboardState;
@@ -304,8 +373,6 @@ const u8 *Controller::GetControllerState()
     if (g_Supervisor.gameController != NULL)
     {
         memset(&g_ControllerData, 0, sizeof(g_ControllerData));
-
-        SDL_Joystick *joystick = SDL_GameControllerGetJoystick(g_Supervisor.gameController);
 
         for (int i = 0; i < SDL_CONTROLLER_BUTTON_MAX; i++)
         {
