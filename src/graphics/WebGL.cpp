@@ -519,7 +519,7 @@ void WebGL::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDataTyp
 
 void WebGL::SetTextureSubImage(i32 xoffset, i32 yoffset, i32 width, i32 height, const void *data)
 {
-    g_glFuncTable.glTexSubImage2D(GL_TEXTURE_2D, 0, xoffset, yoffset, width, height, GL_RGB, GL_UNSIGNED_BYTE, data);
+    g_glFuncTable.glTexSubImage2D(GL_TEXTURE_2D, 0, xoffset, yoffset, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data);
 }
 
 void WebGL::ReadPixels(i32 x, i32 y, i32 width, i32 height, const void *pixels)

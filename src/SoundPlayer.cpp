@@ -454,7 +454,6 @@ void SoundPlayer::MixAudio(u32 samples)
 {
     std::vector<i16> finalBuffer(samples);
     std::vector<i32> mixBuffer(samples);
-    u8 playingChannels = 0;
 
     this->soundBufMutex.lock();
 
@@ -464,8 +463,6 @@ void SoundPlayer::MixAudio(u32 samples)
         {
             continue;
         }
-
-        playingChannels++;
 
         const u32 samplesToMix = std::min(samples / 2, this->soundBuffers[i].len - this->soundBuffers[i].pos);
 
@@ -559,17 +556,18 @@ void SoundPlayer::MixAudio(u32 samples)
             }
         }
 
-        playingChannels++;
     }
 
     this->soundBufMutex.unlock();
 
-    const int mixDivisor = std::max(1, (int)playingChannels);
-
     for (u32 i = 0; i < samples; i++)
     {
-
-        finalBuffer[i] = mixBuffer[i] / mixDivisor;
+        i32 mixedSample = mixBuffer[i];
+        if (mixedSample > 32767)
+            mixedSample = 32767;
+        else if (mixedSample < -32768)
+            mixedSample = -32768;
+        finalBuffer[i] = (i16)mixedSample;
     }
 
     SDL_QueueAudio(this->audioDev, finalBuffer.data(), samples * 2);

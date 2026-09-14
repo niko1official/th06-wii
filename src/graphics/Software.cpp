@@ -346,7 +346,7 @@ void Software::SetTextureSubImage(i32 xoffset, i32 yoffset, i32 width, i32 heigh
 {
     if (boundTexture)
     {
-        SDL_ConvertPixels(width, height, SDL_PIXELFORMAT_RGB24, data, width * 3, SDL_PIXELFORMAT_ARGB8888,
+        SDL_ConvertPixels(width, height, SDL_PIXELFORMAT_RGBA32, data, width * 4, SDL_PIXELFORMAT_ARGB8888,
                           boundTexture->texels.data() + (yoffset * boundTexture->width) + xoffset,
                           boundTexture->width * sizeof(u32));
     }

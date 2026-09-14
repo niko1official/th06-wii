@@ -590,12 +590,16 @@ void GXBackend::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDat
         return;
 
     TextureSlot &slot = textures[boundTexture];
-    if (slot.gxData)
+    if (slot.gxData && (slot.width != width || slot.height != height))
+    {
         free(slot.gxData);
+        slot.gxData = nullptr;
+    }
     if (slot.rgba)
+    {
         free(slot.rgba);
-    slot.gxData = nullptr;
-    slot.rgba = nullptr;
+        slot.rgba = nullptr;
+    }
     slot.width = width;
     slot.height = height;
     slot.valid = false;
@@ -603,31 +607,66 @@ void GXBackend::SetTextureImage(u32 width, u32 height, PixelFormat fmt, PixelDat
     if (width == 0 || height == 0)
         return;
 
-    slot.rgba = (u8 *)memalign(32, width * height * 4);
-    if (!slot.rgba)
-        return;
-
-    const u32 bpp = type == PIXEL_UNSIGNED_BYTE ? (fmt == PIXEL_RGBA ? 4 : 3) : 2;
     const u8 *src = (const u8 *)data;
-    const bool isDummyWhiteTexture = !src && width == 1 && height == 1;
-    for (u32 y = 0; y < height; y++)
-    {
-        for (u32 x = 0; x < width; x++)
-        {
-            u8 *d = slot.rgba + (y * width + x) * 4;
-            if (src)
-                ReadPixelRGBA(src + (y * width + x) * bpp, fmt, type, &d[0], &d[1], &d[2], &d[3]);
-            else
-                d[0] = d[1] = d[2] = d[3] = isDummyWhiteTexture ? 255 : 0;
-        }
-    }
-    UploadTexture(slot);
-
     if (src)
     {
-        free(slot.rgba);
-        slot.rgba = nullptr;
+        const u32 paddedW = (width + 3) & ~3u;
+        const u32 paddedH = (height + 3) & ~3u;
+        const u32 texSize = GX_GetTexBufferSize(width, height, GX_TF_RGBA8, GX_FALSE, 0);
+        if (!slot.gxData)
+            slot.gxData = memalign(32, (texSize + 31) & ~31u);
+        if (!slot.gxData)
+            return;
+
+        std::memset(slot.gxData, 0, (texSize + 31) & ~31u);
+        u8 *dst = (u8 *)slot.gxData;
+        const u32 bpp = type == PIXEL_UNSIGNED_BYTE ? (fmt == PIXEL_RGBA ? 4 : 3) : 2;
+        u32 out = 0;
+
+        for (u32 by = 0; by < paddedH; by += 4)
+        {
+            for (u32 bx = 0; bx < paddedW; bx += 4)
+            {
+                u8 rgba[16][4]{};
+                for (u32 ty = 0; ty < 4; ty++)
+                {
+                    for (u32 tx = 0; tx < 4; tx++)
+                    {
+                        const u32 x = bx + tx;
+                        const u32 y = by + ty;
+                        if (x < width && y < height)
+                            ReadPixelRGBA(src + (y * width + x) * bpp, fmt, type, &rgba[ty * 4 + tx][0],
+                                          &rgba[ty * 4 + tx][1], &rgba[ty * 4 + tx][2], &rgba[ty * 4 + tx][3]);
+                    }
+                }
+                for (u32 pixel = 0; pixel < 16; pixel++)
+                {
+                    dst[out++] = rgba[pixel][3];
+                    dst[out++] = rgba[pixel][0];
+                }
+                for (u32 pixel = 0; pixel < 16; pixel++)
+                {
+                    dst[out++] = rgba[pixel][1];
+                    dst[out++] = rgba[pixel][2];
+                }
+            }
+        }
+
+        DCFlushRange(slot.gxData, (texSize + 31) & ~31u);
+        GX_InitTexObj(&slot.obj, slot.gxData, width, height, GX_TF_RGBA8, GX_CLAMP, GX_CLAMP, GX_FALSE);
+        GX_InitTexObjFilterMode(&slot.obj, GX_LINEAR, GX_LINEAR);
+        slot.valid = true;
     }
+    else
+    {
+        slot.rgba = (u8 *)memalign(32, width * height * 4);
+        if (!slot.rgba)
+            return;
+        const u8 fill = width == 1 && height == 1 ? 255 : 0;
+        std::memset(slot.rgba, fill, width * height * 4);
+        UploadTexture(slot);
+    }
+
     GX_LoadTexObj(&slot.obj, GX_TEXMAP0);
     GX_InvalidateTexAll();
 }
