@@ -9,8 +9,10 @@
 #include <SDL2/SDL_ttf.h>
 #include <algorithm>
 #include <cstring>
+#include <vector>
 
 static TTF_Font *g_Font;
+static i32 g_FontSize;
 
 TextHelper::TextHelper()
 {
@@ -36,6 +38,8 @@ ZunResult TextHelper::CreateTextBuffer()
         g_GameErrorContext.Fatal(TH_ERR_FONTS_NOT_FOUND);
         return ZUN_ERROR;
     }
+
+    g_FontSize = 10;
 
     g_TextBufferSurface =
         SDL_CreateRGBSurfaceWithFormat(0, GAME_WINDOW_WIDTH, TEXT_BUFFER_HEIGHT, 32, SDL_PIXELFORMAT_RGBA32);
@@ -178,7 +182,6 @@ void TextHelper::RenderTextToTexture(i32 xPos, i32 yPos, i32 spriteWidth, i32 sp
     SDL_Rect finalCopyDst;
     SDL_Rect finalCopySrc;
     SDL_Rect shadowRect;
-    SDL_Rect textRect;
 
     if (!isUTF8Encoded(string))
     {
@@ -191,7 +194,9 @@ void TextHelper::RenderTextToTexture(i32 xPos, i32 yPos, i32 spriteWidth, i32 sp
         strcpy(convertedText, string);
     }
 
-    TTF_SetFontSize(g_Font, fontHeight * 2);
+    i32 requestedFontSize = fontHeight * 2;
+    if (requestedFontSize != g_FontSize && TTF_SetFontSize(g_Font, requestedFontSize) == 0)
+        g_FontSize = requestedFontSize;
 
     finalCopySrc.x = 0;
     finalCopySrc.y = 0;
@@ -236,17 +241,13 @@ void TextHelper::RenderTextToTexture(i32 xPos, i32 yPos, i32 spriteWidth, i32 sp
 
     if (regularText != NULL)
     {
-        textRect.x = xPos * 2;
-        textRect.y = 0;
-        textRect.w = regularText->w;
-        textRect.h = regularText->h;
-
         SurfaceOverwriteBlend(regularText, g_TextBufferSurface, xPos * 2);
 
         SDL_FreeSurface(regularText);
     }
 
-    if (!outTexture->textureData || outTexture->format != TEX_FMT_A8R8G8B8)
+    bool textureRecreated = !outTexture->textureData || outTexture->format != TEX_FMT_A8R8G8B8;
+    if (textureRecreated)
     {
         free(outTexture->textureData);
         outTexture->textureData = (u8 *)malloc(outTexture->width * outTexture->height * 4);
@@ -272,8 +273,30 @@ void TextHelper::RenderTextToTexture(i32 xPos, i32 yPos, i32 spriteWidth, i32 sp
 
     g_AnmManager->SetCurrentTexture(outTexture->handle);
 
-    g_GfxBackend->SetTextureImage(outTexture->width, outTexture->height, PIXEL_RGBA, PIXEL_UNSIGNED_BYTE,
-                                  outTexture->textureData);
+    if (textureRecreated)
+    {
+        g_GfxBackend->SetTextureImage(outTexture->width, outTexture->height, PIXEL_RGBA, PIXEL_UNSIGNED_BYTE,
+                                      outTexture->textureData);
+    }
+    else
+    {
+        i32 updateX = 0;
+        i32 updateY = std::max(0, finalCopyDst.y);
+        i32 updateWidth = std::min(finalCopyDst.w, (i32)outTexture->width);
+        i32 updateHeight = std::min(finalCopyDst.h, (i32)outTexture->height - updateY);
+
+        if (updateWidth > 0 && updateHeight > 0)
+        {
+            std::vector<u8> updatedPixels(updateWidth * updateHeight * 4);
+            for (i32 row = 0; row < updateHeight; row++)
+            {
+                std::memcpy(updatedPixels.data() + row * updateWidth * 4,
+                            outTexture->textureData + ((updateY + row) * outTexture->width + updateX) * 4,
+                            updateWidth * 4);
+            }
+            g_GfxBackend->SetTextureSubImage(updateX, updateY, updateWidth, updateHeight, updatedPixels.data());
+        }
+    }
 
     SDL_FreeSurface(textureSurface);
 
@@ -286,6 +309,7 @@ void TextHelper::ReleaseTextBuffer()
     {
         TTF_CloseFont(g_Font);
         g_Font = NULL;
+        g_FontSize = 0;
     }
 
     if (g_TextBufferSurface != NULL)

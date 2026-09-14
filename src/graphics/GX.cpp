@@ -476,7 +476,6 @@ void GXBackend::BindTexture(GfxTextureHandle handle)
         return;
 
     GX_LoadTexObj(&textures[boundTexture].obj, GX_TEXMAP0);
-    GX_InvalidateTexAll();
 }
 
 void GXBackend::DeleteTexture(GfxTextureHandle handle)
@@ -638,25 +637,36 @@ void GXBackend::SetTextureSubImage(i32 xoffset, i32 yoffset, i32 width, i32 heig
     if (!data || boundTexture == 0 || boundTexture >= MAX_TEXTURES)
         return;
     TextureSlot &slot = textures[boundTexture];
-    if (!slot.rgba || xoffset < 0 || yoffset < 0 || xoffset + width > (i32)slot.width ||
+    if (!slot.gxData || xoffset < 0 || yoffset < 0 || xoffset + width > (i32)slot.width ||
         yoffset + height > (i32)slot.height)
         return;
 
     const u8 *src = (const u8 *)data;
+    u8 *dst = (u8 *)slot.gxData;
+    const u32 tilesPerRow = (slot.width + 3) / 4;
     for (i32 y = 0; y < height; y++)
+    {
         for (i32 x = 0; x < width; x++)
         {
-            u8 *d = slot.rgba + (((u32)(yoffset + y) * slot.width + (u32)(xoffset + x)) * 4);
-            const u8 *s = src + ((u32)y * (u32)width + (u32)x) * 3;
-            d[0] = s[0];
-            d[1] = s[1];
-            d[2] = s[2];
-            d[3] = 255;
-        }
+            const u32 dstX = (u32)(xoffset + x);
+            const u32 dstY = (u32)(yoffset + y);
+            const u32 tileOffset = ((dstY / 4) * tilesPerRow + dstX / 4) * 64;
+            const u32 pixelOffset = ((dstY & 3) * 4 + (dstX & 3)) * 2;
+            const u8 *s = src + ((u32)y * (u32)width + (u32)x) * 4;
+            dst[tileOffset + pixelOffset] = s[3];
+            dst[tileOffset + pixelOffset + 1] = s[0];
+            dst[tileOffset + 32 + pixelOffset] = s[1];
+            dst[tileOffset + 32 + pixelOffset + 1] = s[2];
 
-    UploadTexture(slot);
-    GX_LoadTexObj(&slot.obj, GX_TEXMAP0);
+            if (slot.rgba)
+                std::memcpy(slot.rgba + (dstY * slot.width + dstX) * 4, s, 4);
+        }
+    }
+
+    const u32 texSize = GX_GetTexBufferSize(slot.width, slot.height, GX_TF_RGBA8, GX_FALSE, 0);
+    DCFlushRange(slot.gxData, (texSize + 31) & ~31u);
     GX_InvalidateTexAll();
+    GX_LoadTexObj(&slot.obj, GX_TEXMAP0);
 }
 
 void GXBackend::ReadPixels(i32 x, i32 y, i32 width, i32 height, const void *pixels)
