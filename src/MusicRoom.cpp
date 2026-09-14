@@ -23,9 +23,6 @@ bool MusicRoom::ProcessInput()
 {
     i32 i;
     char lineCharBuffer[64];
-    i32 listPos;
-
-    listPos = this->listingOffset;
 
     if (WAS_PRESSED(TH_BUTTON_UP))
     {
@@ -302,7 +299,7 @@ ZunResult MusicRoom::AddedCallback(MusicRoom *musicRoom)
                 }
             }
 
-            while (*currChar == '\n' && *currChar == '\r')
+            while (*currChar == '\n' || *currChar == '\r')
             {
                 currChar++;
                 if (currChar - fileBase >= (i32)g_LastFileSize)
@@ -396,7 +393,7 @@ finishMusiccmtRead:
 
 ZunResult MusicRoom::DeletedCallback(MusicRoom *musicRoom)
 {
-    delete musicRoom->trackDescriptors;
+    delete[] musicRoom->trackDescriptors;
     musicRoom->trackDescriptors = NULL;
 
     g_AnmManager->ReleaseSurface(0);

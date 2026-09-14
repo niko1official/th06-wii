@@ -504,16 +504,31 @@ void SoundPlayer::MixAudio(u32 samples)
             const u32 samplesToMix =
                 std::min((samples / 2) - samplesMixed, this->backgroundMusic.loopEnd - this->backgroundMusic.pos);
 
-            for (u32 j = 0; j < samplesToMix; j++)
+            if (samplesToMix == 0)
+                break;
+
+            const u32 interleavedSamples = samplesToMix * 2;
+            const u32 samplesRead = SDL_RWread(this->backgroundMusic.srcWav.fileStream, finalBuffer.data(),
+                                               sizeof(i16), interleavedSamples);
+            const u32 framesRead = samplesRead / 2;
+
+            for (u32 j = 0; j < framesRead; j++)
             {
-                mixBuffer[samplesMixed + j * 2] +=
-                    ((i16)SDL_ReadLE16(this->backgroundMusic.srcWav.fileStream)) * fadeoutMult;
-                mixBuffer[samplesMixed + j * 2 + 1] +=
-                    ((i16)SDL_ReadLE16(this->backgroundMusic.srcWav.fileStream)) * fadeoutMult;
+                mixBuffer[(samplesMixed + j) * 2] +=
+                    (i16)SDL_SwapLE16((u16)finalBuffer[j * 2]) * fadeoutMult;
+                mixBuffer[(samplesMixed + j) * 2 + 1] +=
+                    (i16)SDL_SwapLE16((u16)finalBuffer[j * 2 + 1]) * fadeoutMult;
             }
 
-            this->backgroundMusic.pos += samplesToMix;
-            samplesMixed += samplesToMix;
+            this->backgroundMusic.pos += framesRead;
+            samplesMixed += framesRead;
+
+            if (framesRead != samplesToMix)
+            {
+                SDL_RWclose(this->backgroundMusic.srcWav.fileStream);
+                this->backgroundMusic.srcWav.fileStream = NULL;
+                break;
+            }
 
             if (this->backgroundMusic.pos == this->backgroundMusic.loopEnd)
             {
@@ -549,7 +564,7 @@ void SoundPlayer::MixAudio(u32 samples)
 
     this->soundBufMutex.unlock();
 
-    const int mixDivisor = std::max(8, (int)playingChannels);
+    const int mixDivisor = std::max(1, (int)playingChannels);
 
     for (u32 i = 0; i < samples; i++)
     {
